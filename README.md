@@ -20,3 +20,4 @@ If you found a bug or have a echancement, feel free to make a pull request.
 
 ### TODO:
 * [ ] Add GradientBoosting
+* [ ] Fix DecisionTree freezes
