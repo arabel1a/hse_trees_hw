@@ -1,16 +1,21 @@
-import itertools
+from queue import Queue
+from typing import Any
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 
-from networkx.drawing.nx_pydot import graphviz_layout
-from queue import Queue
-from typing import Any
-
 
 class TreeNode:
-    def __init__(self, attribute: str, ig:float, parent=None, parent_attribute_value=None, lvl=0):
+    def __init__(
+        self,
+        attribute: str,
+        ig: float,
+        parent=None,
+        parent_attribute_value=None,
+        lvl=0,
+    ):
         """
         Args:
         - attribute (str): the name of the feature, by which the dataset will be divided
@@ -23,16 +28,16 @@ class TreeNode:
         self.ig = ig
         self.parent = parent
         self.parent_attribute_value = parent_attribute_value
-        self.lvl=lvl
+        self.lvl = lvl
         self.children = []
         self.children_attributes = []
-    
+
     def set_prediction(self, prediction):
         """
         Sets node predictions
         """
         self.prediction = prediction
-    
+
     def get_prediction(self):
         """
         Returns node predictions
@@ -41,22 +46,27 @@ class TreeNode:
 
     def print_tree(self):
         """
-        Prints the structure of the tree. 
+        Prints the structure of the tree.
         """
-        space = '  ' * self.lvl
+        space = "  " * self.lvl
         if not self.children:
-            print(f'{space}lvl#{self.lvl}: '
-                  f'parent_attr_val = {self.parent_attribute_value}, '
-                  f'prediction = {self.prediction.values}')
+            print(
+                f"{space}lvl#{self.lvl}: "
+                f"parent_attr_val = {self.parent_attribute_value}, "
+                f"prediction = {self.prediction.values}",
+            )
         else:
-            print(f'{space}lvl#{self.lvl}: attribute = {self.attribute}, '
-                  f'parent_attr_val = {self.parent_attribute_value}')
+            print(
+                f"{space}lvl#{self.lvl}: attribute = {self.attribute}, "
+                f"parent_attr_val = {self.parent_attribute_value}",
+            )
         for child in self.children:
             child.print_tree()
 
+
 class DecisionTree:
-    def __init__(self):
-        pass       
+    def __init__(self, max_depth=10):
+        self.max_depth = max_depth
 
     @staticmethod
     def calculate_target_entropy(df: pd.DataFrame, target) -> float:
@@ -70,19 +80,24 @@ class DecisionTree:
         - float: Target entropy value.
         """
 
-        grouped = df.groupby(target).agg({'__weight':'sum'})
-        
+        grouped = df.groupby(target).agg({"__weight__": "sum"})
+
         entropy = 0
         # value_counts = vector.value_counts()
-        total = df['__weight'].sum()    
-        
+        total = df["__weight__"].sum()
+
         for _, row in grouped.iterrows():
-            p = row['__weight'] / total
+            p = row["__weight__"] / total
             entropy += -p * np.log(p)
         return entropy
-       
+
     # Calculate E(Target | Attribute) - Entropy of Features
-    def calculate_attribute_entropy(self, dataframe: pd.DataFrame, attribute: str, target: str) -> float: 
+    def calculate_attribute_entropy(
+        self,
+        dataframe: pd.DataFrame,
+        attribute: str,
+        target: str,
+    ) -> float:
         """
         Calculate the entropy of features based on a specific attribute.
 
@@ -100,11 +115,16 @@ class DecisionTree:
         for value in attribute_values:
             dataframe_ = dataframe[dataframe[attribute] == value]
             value_entropy = self.calculate_target_entropy(dataframe_, target)
-            p = dataframe_.shape[0] / obj_num 
+            p = dataframe_.shape[0] / obj_num
             entropy += p * value_entropy
         return entropy
 
-    def calculate_information_gain(self, dataframe: pd.DataFrame, attribute: str, target: str) -> float:
+    def calculate_information_gain(
+        self,
+        dataframe: pd.DataFrame,
+        attribute: str,
+        target: str,
+    ) -> float:
         """
         Calculate information gain for a specific attribute.
 
@@ -119,7 +139,11 @@ class DecisionTree:
         if attribute == target:
             return 0
         target_entropy = self.calculate_target_entropy(dataframe, target)
-        attribute_entropy = self.calculate_attribute_entropy(dataframe, attribute, target)
+        attribute_entropy = self.calculate_attribute_entropy(
+            dataframe,
+            attribute,
+            target,
+        )
         return target_entropy - attribute_entropy
 
     def winner_attribute(self, df: pd.DataFrame, target: str) -> str:
@@ -140,15 +164,21 @@ class DecisionTree:
             if column == target:
                 continue
             ig = self.calculate_information_gain(
-                df, column, target
+                df,
+                column,
+                target,
             )
             if ig > max_ig:
                 max_ig = ig
                 winner_feature = column
         return winner_feature, max_ig
-    
-        
-    def split_dataset(self, df: pd.DataFrame, attribute: str, value: Any) -> pd.DataFrame:
+
+    def split_dataset(
+        self,
+        df: pd.DataFrame,
+        attribute: str,
+        value: Any,
+    ) -> pd.DataFrame:
         """
         Split the dataset based on the decision node.
 
@@ -161,8 +191,8 @@ class DecisionTree:
         - pd.DataFrame: Subdataset after splitting.
         """
         return df[df[attribute] == value].reset_index(drop=True)
-            
-    def build_tree(self, df: pd.DataFrame, target: str, weight:str=None, max_depth=100) -> Any:
+
+    def build_tree(self, df: pd.DataFrame, target: str, weight: str = None) -> Any:
         """
         Args:
         - df (pd.DataFrame): Input dataset.
@@ -172,9 +202,9 @@ class DecisionTree:
         - root (TreeNode): root of the DecisionTree
         """
         if weight is None:
-            df['__weight'] = 1.
+            df["__weight__"] = 1.0
         else:
-            df['__weight'] = df[weigth]
+            df["__weight__"] = df[weight]
         attribute, ig = self.winner_attribute(df, target)
         root = TreeNode(attribute, ig)
         q = Queue()
@@ -187,13 +217,17 @@ class DecisionTree:
             unique_attr = partition[current.attribute].unique()
             if current.ig > 0:
                 for u in unique_attr:
-                    tmp = self.split_dataset(partition, attribute=current.attribute, value=u)
+                    tmp = self.split_dataset(
+                        partition,
+                        attribute=current.attribute,
+                        value=u,
+                    )
                     tmp.drop(current.attribute, axis=1, inplace=True)
                     attribute, ig = self.winner_attribute(tmp, target)
-                    child = TreeNode(attribute, ig, current, u, current.lvl+1)
+                    child = TreeNode(attribute, ig, current, u, current.lvl + 1)
                     current.children.append(child)
                     current.children_attributes.append(u)
-                    if current.lvl < max_depth and  tmp.shape[0] > 1 and current.lvl < (df.shape[1]-2):
+                    if current.lvl < self.max_depth and tmp.shape[0] > 1 and current.lvl < (df.shape[1] - 2):
                         q.put(child)
                         parent_partitions.put(tmp)
                     else:
@@ -201,16 +235,18 @@ class DecisionTree:
             else:
                 current.set_prediction(partition[target])
         return root
-    
+
     # Start training process. Ultimate goal is to make a decision tree.
-    def fit(self, df: pd.DataFrame, **kwargs) -> None:
+    def fit(self, X: pd.DataFrame, y: pd.Series, weight=None) -> None:
         """
         Start the training process to build the decision tree.
 
         Args:
         - df (pd.DataFrame): Input dataset.
         """
-        self.tree = self.build_tree(df, **kwargs) 
+        df = X.copy()
+        df["__target__"] = y
+        self.tree = self.build_tree(df, target="__target__", weight=weight)
         return
 
     def traverse_tree(self, x_test: pd.Series, root: TreeNode) -> Any:
@@ -229,12 +265,12 @@ class DecisionTree:
         while node.children:
             value = x_test[node.attribute]
             for ch, att in zip(node.children, node.children_attributes):
-                if(att == value):
+                if att == value:
                     node = ch
                     break
-        return node.get_prediction() 
-    
-    def predict(self, X_test: pd.DataFrame, undefined_value='Undefined') -> Any:
+        return node.get_prediction()
+
+    def predict(self, X_test: pd.DataFrame, undefined_value="Undefined") -> Any:
         """
         Predict the class using input values.
 
@@ -244,67 +280,76 @@ class DecisionTree:
 
         Returns:
         - pd.DataFrame: DataFrame of predicted classes.
-        
+
         """
-        if hasattr(self, 'tree'):
+        if hasattr(self, "tree"):
             tree = self.tree
         else:
-            print('This DecisionTree instance is not fitted yet.')
+            print("This DecisionTree instance is not fitted yet.")
             return
         prediction = X_test.apply(self.traverse_tree, root=tree, axis=1)
         if prediction.shape[1] > 1:
             undefined = ~prediction.isna().any(axis=1)
-            prediction[undefined] =  undefined_value
-        return prediction[0]
-    
+            prediction[undefined] = undefined_value
+        return prediction[0].to_numpy()
+
     def check_tree(self):
         """
         Prints the structure of the tree.
         """
-        if hasattr(self, 'tree'):
+        if hasattr(self, "tree"):
             self.tree.print_tree()
         else:
-            print('This DecisionTree instance is not fitted yet.')
+            print("This DecisionTree instance is not fitted yet.")
 
-
-
-def draw_tree(tree: DecisionTree, fig_w=10, fig_h=5, arrow_size=20, font_size=12):
-    """
-    Plots given DecisionTree.
-    Args:
-     - tree (DecisionTree): the tree to draw
-     - fig_w (int, optional): figure width
-     - fig_h (int, optional): figure height
-     - arrow_size (int, optional): size of the arrow end
-     - font_size (int, optional): fort size of the labels
-    """
-    G = nx.DiGraph()
-    q = Queue()
-    q.put(tree)
-    edge_labels = {}
-    node_labels = {}
-    while not q.empty():
-        current = q.get()
-        if(current.children):
-            node_labels[current] = f'IG = {current.ig:0.3f}\n{current.attribute}'
-        else:
-            node_labels[current] = dict(current.get_prediction().value_counts())
-        for ch in current.children:
-            edge_labels[current, ch] = ch.parent_attribute_value
-            G.add_edge(current, ch)
-            q.put(ch)
-    plt.figure(figsize=(fig_w, fig_h));
-    pos = nx.nx_agraph.graphviz_layout(G, 'dot') 
-    nx.draw(
-        G, pos, node_shape='', edge_color='k', 
-        arrowsize=arrow_size, arrowstyle='->'
-    )
-    nx.draw_networkx_edge_labels(
-        G, pos, edge_labels=edge_labels, 
-        font_color='r', font_size=font_size
-    )
-    box = dict(facecolor='w', edgecolor='black', boxstyle='square, pad=0.2')
-    nx.draw_networkx_labels(
-        G, pos, labels=node_labels, 
-        bbox=box, font_size=font_size
-    );
+    def plot_tree(self, fig_w=10, fig_h=5, arrow_size=20, font_size=12):
+        """
+        Plots given DecisionTree.
+        Args:
+         - tree (DecisionTree): the tree to draw
+         - fig_w (int, optional): figure width
+         - fig_h (int, optional): figure height
+         - arrow_size (int, optional): size of the arrow end
+         - font_size (int, optional): fort size of the labels
+        """
+        tree = self.tree
+        G = nx.DiGraph()
+        q = Queue()
+        q.put(tree)
+        edge_labels = {}
+        node_labels = {}
+        while not q.empty():
+            current = q.get()
+            if current.children:
+                node_labels[current] = f"IG = {current.ig:0.3f}\n{current.attribute}"
+            else:
+                node_labels[current] = dict(current.get_prediction().value_counts())
+            for ch in current.children:
+                edge_labels[current, ch] = ch.parent_attribute_value
+                G.add_edge(current, ch)
+                q.put(ch)
+        plt.figure(figsize=(fig_w, fig_h))
+        pos = nx.nx_agraph.graphviz_layout(G, "dot")
+        nx.draw(
+            G,
+            pos,
+            node_shape="",
+            edge_color="k",
+            arrowsize=arrow_size,
+            arrowstyle="->",
+        )
+        nx.draw_networkx_edge_labels(
+            G,
+            pos,
+            edge_labels=edge_labels,
+            font_color="r",
+            font_size=font_size,
+        )
+        box = dict(facecolor="w", edgecolor="black", boxstyle="square, pad=0.2")
+        nx.draw_networkx_labels(
+            G,
+            pos,
+            labels=node_labels,
+            bbox=box,
+            font_size=font_size,
+        )
