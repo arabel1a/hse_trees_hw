@@ -65,8 +65,9 @@ class TreeNode:
 
 
 class DecisionTree:
-    def __init__(self, max_depth=10):
+    def __init__(self, max_depth=10, regression=False):
         self.max_depth = max_depth
+        self.regression = regression
 
     @staticmethod
     def calculate_target_entropy(df: pd.DataFrame, target) -> float:
@@ -215,6 +216,7 @@ class DecisionTree:
             current = q.get()
             partition = parent_partitions.get()
             unique_attr = partition[current.attribute].unique()
+            current.set_prediction(partition[target])
             if current.ig > 0:
                 for u in unique_attr:
                     tmp = self.split_dataset(
@@ -232,8 +234,6 @@ class DecisionTree:
                         parent_partitions.put(tmp)
                     else:
                         child.set_prediction(tmp[target])
-            else:
-                current.set_prediction(partition[target])
         return root
 
     # Start training process. Ultimate goal is to make a decision tree.
@@ -264,6 +264,8 @@ class DecisionTree:
         value = x_test[node.attribute]
         while node.children:
             value = x_test[node.attribute]
+            if value not in node.children_attributes:
+                break
             for ch, att in zip(node.children, node.children_attributes):
                 if att == value:
                     node = ch
@@ -288,10 +290,11 @@ class DecisionTree:
             print("This DecisionTree instance is not fitted yet.")
             return
         prediction = X_test.apply(self.traverse_tree, root=tree, axis=1)
-        if prediction.shape[1] > 1:
-            undefined = ~prediction.isna().any(axis=1)
-            prediction[undefined] = undefined_value
-        return prediction[0].to_numpy()
+
+        if not self.regression:
+            return prediction.mode(axis=1)[0]
+        else:
+            return prediction.mean(axis=1)
 
     def check_tree(self):
         """
